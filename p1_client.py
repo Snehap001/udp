@@ -20,45 +20,47 @@ def receive_file(server_ip, server_port):
     expected_seq_num = 0
     output_file_path = "received_file.txt"  # Default file name
     k=0
-    with open(output_file_path, 'wb') as file:
-        num=-1
-        packet_info = {
+
+    packet_info = {
             'signal': "START",
                 # Convert bytes to string for JSON serialization
         }
         
-        # Convert the packet_info dictionary to a JSON string and append a newline
-        json_packet = json.dumps(packet_info)
-        json_packet+="<EOP>"
+    # Convert the packet_info dictionary to a JSON string and append a newline
+    json_packet = json.dumps(packet_info)
+    json_packet+="<EOP>"
+    
+    
+    start_packet = json_packet.encode() 
+    while True:
+        try:
+            client_socket.sendto(start_packet, server_address)
+            packet_data, _ = client_socket.recvfrom(MSS + 100) 
+            start=packet_data.decode().split('<EOP>')
+            sign=find_signal(start[0])
+            if sign=="CONNECT":
+                print(f"Connection established with server")
+                packet_info = {
+                    'signal': "RECEIVE",
+                        # Convert bytes to string for JSON serialization
+                }
+                
+                # Convert the packet_info dictionary to a JSON string and append a newline
+                json_packet = json.dumps(packet_info)
+                json_packet+="<EOP>"
+                
+                
+                receive_packet = json_packet.encode() 
+                client_socket.sendto(receive_packet, server_address)
+
+
+                break
+        except socket.timeout:
+            print("waiting for reply")
+
+    with open(output_file_path, 'wb') as file:
         
         
-        start_packet = json_packet.encode() 
-        while True:
-            try:
-                client_socket.sendto(start_packet, server_address)
-                packet_data, _ = client_socket.recvfrom(MSS + 100) 
-                start=packet_data.decode().split('<EOP>')
-                sign=find_signal(start[0])
-                if sign=="CONNECT":
-                    print(f"Connection established with server")
-                    packet_info = {
-                        'signal': "RECEIVE",
-                            # Convert bytes to string for JSON serialization
-                    }
-                    
-                    # Convert the packet_info dictionary to a JSON string and append a newline
-                    json_packet = json.dumps(packet_info)
-                    json_packet+="<EOP>"
-                    
-                    
-                    receive_packet = json_packet.encode() 
-                    client_socket.sendto(receive_packet, server_address)
-
-
-                    break
-            except socket.timeout:
-                print("waiting for reply")
-
 
 
         file_transfer_ongoing=True
@@ -69,6 +71,7 @@ def receive_file(server_ip, server_port):
                 
                 # Receive the packet
                 packet_data, _ = client_socket.recvfrom(MSS + 100)  # Allow room for headers
+
                 packets = packet_data.decode().split('<EOP>')
              
                 for packet in packets[:-1]:
@@ -76,7 +79,10 @@ def receive_file(server_ip, server_port):
                     # Logic to handle end of file
                   
                     end_signal=find_signal(packet)
-                
+                    if end_signal=="CONNECT":
+                        client_socket.sendto(receive_packet, server_address)
+                        break
+
                     if end_signal=="END" :
                         while expected_seq_num in buffer:
                             file.write(buffer.pop(expected_seq_num))  # Write the next in-order packet from the buffer
