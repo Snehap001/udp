@@ -41,6 +41,20 @@ def receive_file(server_ip, server_port):
                 sign=find_signal(start[0])
                 if sign=="CONNECT":
                     print(f"Connection established with server")
+                    packet_info = {
+                        'signal': "RECEIVE",
+                            # Convert bytes to string for JSON serialization
+                    }
+                    
+                    # Convert the packet_info dictionary to a JSON string and append a newline
+                    json_packet = json.dumps(packet_info)
+                    json_packet+="<EOP>"
+                    
+                    
+                    receive_packet = json_packet.encode() 
+                    client_socket.sendto(receive_packet, server_address)
+
+
                     break
             except socket.timeout:
                 print("waiting for reply")

@@ -61,27 +61,44 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                 if client_address:
                     server_socket.sendto(packet, client_address)
                 else:
-                    
-                    print("Waiting for client connection...")
-                    data, client_address = server_socket.recvfrom(1024)
-                    data_packet=data.decode().split('<EOP>')
-                    sign=find_signal(data_packet[0])
-                    if sign=="START":
-                        print(f"Connection established with client {client_address}")
-                        packet_info = {
-                            'signal': "CONNECT",
-                            # Convert bytes to string for JSON serialization
-                        }
-                        
-                        # Convert the packet_info dictionary to a JSON string and append a newline
-                        json_packet = json.dumps(packet_info)
-                        json_packet+="<EOP>"
-                        
-                        
-                        connect_packet = json_packet.encode() 
-                        server_socket.sendto(connect_packet, client_address)
+                    connection=False
+                    while not(connection):
+                        try:
+                            print("Waiting for client connection...")
+                            data, client_address = server_socket.recvfrom(1024)
+                            data_packet=data.decode().split('<EOP>')
+                            sign=find_signal(data_packet[0])
+                            while True:
+                                if sign=="START":
+                                    print(f"Connection established with client {client_address}")
+                                    packet_info = {
+                                        'signal': "CONNECT",
+                                        # Convert bytes to string for JSON serialization
+                                    } 
+                                    
+                                    # Convert the packet_info dictionary to a JSON string and append a newline
+                                    json_packet = json.dumps(packet_info)
+                                    json_packet+="<EOP>"
+                                    
+                                    
+                                    connect_packet = json_packet.encode() 
+                                    server_socket.sendto(connect_packet, client_address)
+                                    try:
+                                        data, client_address = server_socket.recvfrom(1024)
+                                        data_packet=data.decode().split('<EOP>')
+                                        sign=find_signal(data_packet[0])
+                                        if sign=="RECEIVE":
+                                            connection=True
+                                            break
+                                    except socket.timeout:
+                                        print("resend connect")
+                        except socket.timeout:
+                            print("waiting")
 
-                    
+
+
+
+                        
                     server_socket.sendto(packet, client_address)
 
                 
