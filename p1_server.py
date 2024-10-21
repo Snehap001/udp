@@ -7,7 +7,17 @@ MSS = 1400  # Maximum Segment Size for each packet
 WINDOW_SIZE = 10  # Number of packets in flight
 DUP_ACK_THRESHOLD = 3  # Threshold for duplicate ACKs to trigger fast recovery
 FILE_PATH = "input_file.txt"
-timeout = 3.0  # Initialize timeout to some value but update it as ACK packets arrive
+SAMPLE_RTT=3.0
+ALPHA=0.125
+BETA=0.25
+ESTIMATED_RTT=0
+DEV_RTT=BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
+timeout = ESTIMATED_RTT+4*DEV_RTT  # Initialize timeout to some value but update it as ACK packets arrive
+def update_timeout():
+    global ESTIMATED_RTT,ALPHA,SAMPLE_RTT,DEV_RTT,BETA,timeout
+    ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
+    DEV_RTT=(1-BETA)*DEV_RTT+BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
+    timeout=ESTIMATED_RTT+4*DEV_RTT
 def find_signal(packet):
     
     # Load the JSON data
@@ -67,6 +77,7 @@ def send_file(server_ip, server_port, enable_fast_recovery):
         last_ack_received = -1
 
         isTrue=True
+        eof=False
         while True:
             while len(unacked_packets)<WINDOW_SIZE: ## Use window-based sending
                 chunk = file.read(MSS)
@@ -82,23 +93,26 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                     json_packet = json.dumps(packet_info)
                     json_packet+="<EOP>"
                     
-                    
+                    eof=True
                     end_packet = json_packet.encode() 
                     server_socket.sendto(end_packet, client_address)
-                    
-                    break
+                    try:
+                        packet_data, _ = server_socket.recvfrom(1024)
+                        receive=packet_data.decode().split('<EOP>')
+                        sign=find_signal(receive[0])
+                        if sign=="RECEIVE":
+                            break
+                    except socket.timeout:
+                        print("again sending")
 
+                if eof:
+                    break
                 # Create and send the packet
                 packet = create_packet(seq_num, chunk)
                 if client_address:
                     server_socket.sendto(packet, client_address)
                 else:
                     
-
-
-
-
-                        
                     server_socket.sendto(packet, client_address)
 
                 
@@ -110,10 +124,12 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                 unacked_packets[seq_num] = (packet, time.time())  # Track sent packets
                 print(f"Sent packet {seq_num}")
                 seq_num += 1
-      
+            if eof:
+                continue
             # Wait for ACKs and retransmit if needed
             try:
             	## Handle ACKs, Timeout, Fast retransmit
+            
                 server_socket.settimeout(timeout)
                 ack_packet, _ = server_socket.recvfrom(1024)
                 ack_seq_num = process_buffer(ack_packet)
@@ -146,6 +162,7 @@ def send_file(server_ip, server_port, enable_fast_recovery):
 
             except socket.timeout:
                 # Timeout handling: retransmit all unacknowledged packets
+                update_timeout()
                 print("Timeout occurred, retransmitting unacknowledged packets")
                 retransmit_unacked_packets(server_socket, client_address, unacked_packets)
 

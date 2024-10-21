@@ -7,6 +7,7 @@ from mininet.log import setLogLevel
 import time, re, os
 import sys
 import hashlib
+from mininet.clean import cleanup
 
 class CustomTopo(Topo):
     def build(self, loss, delay):
@@ -71,6 +72,7 @@ def run(expname):
         for DELAY in delay_list:
             for FAST_RECOVERY in [1, 0]:
                 for i in range(0, NUM_ITERATIONS):
+                    # os.system(f"lsof -t -i:{SERVER_PORT}")
                     print(f"\n--- Running topology with {LOSS}% packet loss, {DELAY}ms delay and fast recovery {FAST_RECOVERY}")
                     # Create the custom topology with the specified loss
                     topo = CustomTopo(loss=LOSS, delay=DELAY)
@@ -88,8 +90,8 @@ def run(expname):
 
                     start_time = time.time()
                     SERVER_IP=h1.IP()
-                    h1.cmd(f"sudo python3 p1_server.py {SERVER_IP} {SERVER_PORT} {FAST_RECOVERY} &")
-                    result = h2.cmd(f"sudo python3 p1_client.py {SERVER_IP} {SERVER_PORT}")
+                    h1.cmd(f"sudo python3 p1_server.py {SERVER_IP} {SERVER_PORT} {FAST_RECOVERY} > server_output.log 2>&1 &")
+                    result = h2.cmd(f"sudo python3 p1_client.py {SERVER_IP} {SERVER_PORT} > client_output.log 2>&1 ")
                     end_time = time.time()
                     print(f"client output : \n {result}")
                     ttc = end_time-start_time
@@ -100,9 +102,10 @@ def run(expname):
 
                     # Stop the network
                     net.stop()
+                    cleanup()
 
                     # Wait a moment before starting the next iteration
-                    time.sleep(1)
+                    time.sleep(3)
 
     print("\n--- Completed all tests ---")
 

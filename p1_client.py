@@ -90,6 +90,7 @@ def receive_file(server_ip, server_port):
                             expected_seq_num += 1
                         print("Received END signal from server, file transfer complete")
                         file_transfer_ongoing=False
+                        client_socket.sendto(receive_packet, server_address)
                         break
                    
                     seq_num, data = parse_packet(packet)
