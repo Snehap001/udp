@@ -5,6 +5,17 @@ import json
 # Constants
 MSS = 1400  # Maximum Segment Size
 buffer = {}
+SAMPLE_RTT=3.0
+ALPHA=0.125
+BETA=0.25
+ESTIMATED_RTT=0
+DEV_RTT=BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
+timeout = ESTIMATED_RTT+4*DEV_RTT  # Initialize timeout to some value but update it as ACK packets arrive
+def update_timeout():
+    global ESTIMATED_RTT,ALPHA,SAMPLE_RTT,DEV_RTT,BETA,timeout
+    ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
+    DEV_RTT=(1-BETA)*DEV_RTT+BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
+    timeout=ESTIMATED_RTT+4*DEV_RTT
 def receive_file(server_ip, server_port):
     """
     Receive the file from the server with reliability, handling packet loss
@@ -123,6 +134,7 @@ def receive_file(server_ip, server_port):
                 k+=1
 
             except socket.timeout:
+                update_timeout()
                 print("Timeout waiting for data")
 
     client_socket.close()
