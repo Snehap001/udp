@@ -1,13 +1,18 @@
 import socket
 import time
 import argparse
-
+import json
 # Constants
 MSS = 1400  # Maximum Segment Size for each packet
 WINDOW_SIZE = 10  # Number of packets in flight
 DUP_ACK_THRESHOLD = 3  # Threshold for duplicate ACKs to trigger fast recovery
 FILE_PATH = "input_file.txt"
 timeout = 3.0  # Initialize timeout to some value but update it as ACK packets arrive
+def find_signal(packet):
+    
+    # Load the JSON data
+    packet_info = json.loads(packet)
+    return packet_info['signal']
 def send_file(server_ip, server_port, enable_fast_recovery):
     """
     Send a predefined file to the client, ensuring reliability over UDP.
@@ -36,7 +41,17 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                 if not chunk:
                     # End of file
                     # Send end signal to the client 
-                    end_packet = "END".encode()
+                    packet_info = {
+                        'signal': "END",
+                          # Convert bytes to string for JSON serialization
+                    }
+                    
+                    # Convert the packet_info dictionary to a JSON string and append a newline
+                    json_packet = json.dumps(packet_info)
+                    json_packet+="<EOP>"
+                    
+                    
+                    end_packet = json_packet.encode() 
                     server_socket.sendto(end_packet, client_address)
                     
                     break
@@ -49,9 +64,24 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                     
                     print("Waiting for client connection...")
                     data, client_address = server_socket.recvfrom(1024)
-                    print(data)
-                    if data=="-1|START":
+                    data_packet=data.decode().split('<EOP>')
+                    sign=find_signal(data_packet[0])
+                    if sign=="START":
                         print(f"Connection established with client {client_address}")
+                        packet_info = {
+                            'signal': "CONNECT",
+                            # Convert bytes to string for JSON serialization
+                        }
+                        
+                        # Convert the packet_info dictionary to a JSON string and append a newline
+                        json_packet = json.dumps(packet_info)
+                        json_packet+="<EOP>"
+                        
+                        
+                        connect_packet = json_packet.encode() 
+                        server_socket.sendto(connect_packet, client_address)
+
+                    
                     server_socket.sendto(packet, client_address)
 
                 
@@ -120,7 +150,7 @@ def process_buffer(buffer):
 
     # Split the buffer by a newline or other delimiter if packets are separated by it
     # Assuming packets are newline-separated for now
-    packets = decoded_buffer.split("\n")
+    packets = decoded_buffer.split("<EOP>")
     
     # Remove any empty strings that may result from splitting
     packets = [pkt for pkt in packets if pkt]
@@ -140,23 +170,52 @@ def process_buffer(buffer):
     return max_seq_num
 def parse_ack_packet(packet):
     """
-    Function to parse the ack packet and return the sequence number.
-    Packet format: "seq_num|ACK"
+    Parse the packet (in JSON format) to extract the sequence number.
     """
-    # Decode the packet back to a string
     decoded_packet = packet.decode()
-    # Split the packet by '|' to extract the sequence number
-    seq_num_str, _ = decoded_packet.split('|')
     
-    # Convert the sequence number to an integer
-    seq_num = int(seq_num_str)
+    # Load the JSON data
+    packet_info = json.loads(decoded_packet)
     
-    return seq_num, decoded_packet
+    seq_num = packet_info['seq_num']
+    
+    return seq_num, packet_info
 def create_packet(seq_num, data):
     """
-    Create a packet with the sequence number and data.
+    Create a packet with the sequence number and data as a JSON object, and append a newline.
     """
-    return f"{seq_num}|".encode() + data
+    packet_info = {
+        'seq_num': seq_num,
+        'length': len(data),
+        'data': data.decode(),
+        'signal':"DATA" # Convert bytes to string for JSON serialization
+    }
+    
+    # Convert the packet_info dictionary to a JSON string and append a newline
+    json_packet = json.dumps(packet_info)
+    json_packet+="<EOP>"
+    
+    return json_packet.encode()  # Convert to bytes before sending
+
+def read_until_delimiter(sock, delimiter="<EOP>"):
+    """
+    Read from the socket buffer until the custom delimiter is encountered.
+    """
+    buffer = ''
+    while True:
+        # Receive data in chunks
+        chunk, _ = sock.recvfrom(1024)
+        buffer += chunk.decode()  # Decode to string and append to buffer
+        print(buffer)
+        
+        # Check if the custom delimiter is in buffer (end of one packet)
+        if delimiter in buffer:
+            # Split the buffer at the delimiter
+            packet, remaining_buffer = buffer.split(delimiter, 1)
+            
+            # Return the complete packet and the remaining buffer
+            return packet, remaining_buffer
+
     
 
 def retransmit_unacked_packets(server_socket, client_address, unacked_packets):
