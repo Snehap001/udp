@@ -55,7 +55,7 @@ plt.plot(avg_ttc_fast_recovery.index, avg_ttc_fast_recovery.values, label='With 
 plt.plot(avg_ttc_no_fast_recovery.index, avg_ttc_no_fast_recovery.values, label='Without Fast Recovery', marker='x')
 
 # Customize the plot
-plt.title('File Transmission Time vs Loss (With and Without Fast Recovery)')
+plt.title('File Transmission Time vs Delay (With and Without Fast Recovery)')
 plt.xlabel('delay (%)')
 plt.ylabel('Average Transmission Time (TTC)')
 plt.legend()

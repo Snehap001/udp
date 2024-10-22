@@ -7,27 +7,27 @@ MSS = 1400  # Maximum Segment Size for each packet
 WINDOW_SIZE = 10  # Number of packets in flight
 DUP_ACK_THRESHOLD = 3  # Threshold for duplicate ACKs to trigger fast recovery
 FILE_PATH = "input_file.txt"
-SAMPLE_RTT=3.0
-ALPHA=0.125
-BETA=0.25
-ESTIMATED_RTT=0
-DEV_RTT=BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
-timeout = ESTIMATED_RTT+4*DEV_RTT  # Initialize timeout to some value but update it as ACK packets arrive
-def update_timeout():
-    global ESTIMATED_RTT,ALPHA,SAMPLE_RTT,DEV_RTT,BETA,timeout
-    ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
-    DEV_RTT=(1-BETA)*DEV_RTT+BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
-    timeout=ESTIMATED_RTT+4*DEV_RTT
+ # Initialize timeout to some value but update it as ACK packets arrive
+import sys
+sys.stdout.reconfigure(line_buffering=True)
 def find_signal(packet):
     
     # Load the JSON data
     packet_info = json.loads(packet)
     return packet_info['signal']
+
 def send_file(server_ip, server_port, enable_fast_recovery):
     """
     Send a predefined file to the client, ensuring reliability over UDP.
     """
     # Initialize UDP socket
+
+    SAMPLE_RTT=0.05
+    ALPHA=0.125
+    BETA=0.25
+    ESTIMATED_RTT=0.025
+    DEV_RTT=BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
+    timeout = ESTIMATED_RTT+4*DEV_RTT 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_socket.bind((server_ip, server_port))
 
@@ -37,36 +37,17 @@ def send_file(server_ip, server_port, enable_fast_recovery):
     client_address = None
     file_path = FILE_PATH  # Predefined file name
     connection=False
-    while not(connection):
+    while True:
         try:
             print("Waiting for client connection...")
             data, client_address = server_socket.recvfrom(1024)
             data_packet=data.decode().split('<EOP>')
             sign=find_signal(data_packet[0])
-            while True:
-                if sign=="START":
-                    print(f"Connection established with client {client_address}")
-                    packet_info = {
-                        'signal': "CONNECT",
-                        # Convert bytes to string for JSON serialization
-                    } 
-                    
-                    # Convert the packet_info dictionary to a JSON string and append a newline
-                    json_packet = json.dumps(packet_info)
-                    json_packet+="<EOP>"
-                    
-                    
-                    connect_packet = json_packet.encode() 
-                    server_socket.sendto(connect_packet, client_address)
-                    try:
-                        data, client_address = server_socket.recvfrom(1024)
-                        data_packet=data.decode().split('<EOP>')
-                        sign=find_signal(data_packet[0])
-                        if sign=="RECEIVE":
-                            connection=True
-                            break
-                    except socket.timeout:
-                        print("resend connect")
+            
+            if sign=="START":
+                print(f"Connection established with client {client_address}")
+                break
+                 
         except socket.timeout:
             print("waiting")
     with open(file_path, 'rb') as file:
@@ -81,20 +62,39 @@ def send_file(server_ip, server_port, enable_fast_recovery):
         while True:
             while len(unacked_packets)<WINDOW_SIZE: ## Use window-based sending
                 chunk = file.read(MSS)
-                if not chunk:
+                start_time=time.time()
+                if not chunk :
                     # End of file
                     # Send end signal to the client 
-                    packet_info = {
+                    eof=True
+                    break
+                
+                # Create and send the packet
+                packet = create_packet(seq_num, chunk)
+
+                
+                server_socket.sendto(packet, client_address)
+                
+
+                ## 
+
+                unacked_packets[seq_num] = (packet, time.time())  # Track sent packets
+                print(f"Sent packet {seq_num}")
+                seq_num += 1
+            print(f"len of unacked packets: {len(unacked_packets)} ")
+            if eof and len(unacked_packets)==0:
+                packet_info = {
                         'signal': "END",
                           # Convert bytes to string for JSON serialization
-                    }
-                    
-                    # Convert the packet_info dictionary to a JSON string and append a newline
-                    json_packet = json.dumps(packet_info)
-                    json_packet+="<EOP>"
-                    
-                    eof=True
-                    end_packet = json_packet.encode() 
+                }
+                
+                # Convert the packet_info dictionary to a JSON string and append a newline
+                json_packet = json.dumps(packet_info)
+                json_packet+="<EOP>"
+                
+                
+                end_packet = json_packet.encode() 
+                while True:
                     server_socket.sendto(end_packet, client_address)
                     try:
                         packet_data, _ = server_socket.recvfrom(1024)
@@ -104,72 +104,60 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                             break
                     except socket.timeout:
                         print("again sending")
-
-                if eof:
-                    break
-                # Create and send the packet
-                packet = create_packet(seq_num, chunk)
-                if client_address:
-                    server_socket.sendto(packet, client_address)
-                else:
-                    
-                    server_socket.sendto(packet, client_address)
-
-                
-
-                
-
-                ## 
-
-                unacked_packets[seq_num] = (packet, time.time())  # Track sent packets
-                print(f"Sent packet {seq_num}")
-                seq_num += 1
-            if eof:
-                continue
+                print("File transfer complete")
+                break
             # Wait for ACKs and retransmit if needed
             try:
             	## Handle ACKs, Timeout, Fast retransmit
             
                 server_socket.settimeout(timeout)
                 ack_packet, _ = server_socket.recvfrom(1024)
+                data_packet=ack_packet.decode().split('<EOP>')
+                sign=find_signal(data_packet[0])
+                if sign!="ACK":
+                    continue
                 ack_seq_num = process_buffer(ack_packet)
-
+                end_time=time.time()
+                
+                
                 if ack_seq_num > last_ack_received:
+                    if ack_seq_num-1 in unacked_packets:
+                        
+                        SAMPLE_RTT=end_time-unacked_packets[ack_seq_num-1][1]
+                        ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
+                        DEV_RTT=(1-BETA)*DEV_RTT+BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
+                        timeout=ESTIMATED_RTT+4*DEV_RTT
+                        print(timeout)
                     print(f"Received cumulative ACK for packet {ack_seq_num}")
                     for pk in range(last_ack_received,ack_seq_num):
                         if pk in unacked_packets:
                             del unacked_packets[pk]
                     last_ack_received = ack_seq_num
-                    # Slide the window forward
+                    duplicate_ack_count=0
 
-                    
-                    # Remove acknowledged packets from the buffer 
-                    
-                
-
-
-                    
                 else:
                     # Duplicate ACK received
                     
                     print(f"Received duplicate ACK for packet {ack_seq_num}, count={duplicate_ack_count}")
+                    
                     duplicate_ack_count+=1
                     if enable_fast_recovery and duplicate_ack_count >= DUP_ACK_THRESHOLD:
                         print("Entering fast recovery mode")
                         
                         fast_recovery(server_socket,client_address,unacked_packets)
-                        duplicate_ack_count=0
+                        
+                    
 
             except socket.timeout:
                 # Timeout handling: retransmit all unacknowledged packets
-                update_timeout()
+                # update_timeout()
+                
                 print("Timeout occurred, retransmitting unacknowledged packets")
+                print(len(unacked_packets))
                 retransmit_unacked_packets(server_socket, client_address, unacked_packets)
 
             # Check if we are done sending the file
-            if not chunk and len(unacked_packets) == 0:
-                print("File transfer complete")
-                break
+    server_socket.close()
 
 def process_buffer(buffer):
     """
@@ -182,8 +170,6 @@ def process_buffer(buffer):
     # First, decode the buffer to a string
     decoded_buffer = buffer.decode()
 
-    # Split the buffer by a newline or other delimiter if packets are separated by it
-    # Assuming packets are newline-separated for now
     packets = decoded_buffer.split("<EOP>")
     
     # Remove any empty strings that may result from splitting
@@ -256,7 +242,8 @@ def retransmit_unacked_packets(server_socket, client_address, unacked_packets):
     """
     Retransmit all unacknowledged packets.
     """
-    for (packet,time) in unacked_packets.values():
+    for seq_num,(packet,time) in unacked_packets.items():
+        print(f"retransmitted packet: {seq_num}")
         server_socket.sendto(packet, client_address)
     
 

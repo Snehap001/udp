@@ -61,18 +61,20 @@ def run(expname):
     delay_list, loss_list = [], []
     if expname == "loss":
         loss_list = [x*0.5 for x in range (0, 11)]
+        # loss_list=[160]
         delay_list = [20]
     elif expname == "delay":
         delay_list = [x for x in range(0, 201, 20)]
         loss_list = [1]
     print(loss_list, delay_list)
-    
+    client_log="client_output.log"
+    server_log="server_output.log"
     # Loop to create the topology 10 times with varying loss (1% to 10%)
     for LOSS in loss_list:
         for DELAY in delay_list:
             for FAST_RECOVERY in [1, 0]:
                 for i in range(0, NUM_ITERATIONS):
-                    # os.system(f"lsof -t -i:{SERVER_PORT}")
+                    
                     print(f"\n--- Running topology with {LOSS}% packet loss, {DELAY}ms delay and fast recovery {FAST_RECOVERY}")
                     # Create the custom topology with the specified loss
                     topo = CustomTopo(loss=LOSS, delay=DELAY)
@@ -90,8 +92,9 @@ def run(expname):
 
                     start_time = time.time()
                     SERVER_IP=h1.IP()
-                    h1.cmd(f"sudo python3 p1_server.py {SERVER_IP} {SERVER_PORT} {FAST_RECOVERY} > server_output.log 2>&1 &")
-                    result = h2.cmd(f"sudo python3 p1_client.py {SERVER_IP} {SERVER_PORT} > client_output.log 2>&1 ")
+                    
+                    h1.cmd(f"sudo python3 p1_server.py {SERVER_IP} {SERVER_PORT} {FAST_RECOVERY} >> server_output.log 2>&1 &")
+                    result = h2.cmd(f"sudo python3 p1_client.py {SERVER_IP} {SERVER_PORT} >> client_output.log 2>&1 ")
                     end_time = time.time()
                     print(f"client output : \n {result}")
                     ttc = end_time-start_time
@@ -103,9 +106,11 @@ def run(expname):
                     # Stop the network
                     net.stop()
                     cleanup()
+                    os.system(f"lsof -t -iUDP:{SERVER_PORT} | xargs -r kill -9")
 
                     # Wait a moment before starting the next iteration
                     time.sleep(3)
+                    
 
     print("\n--- Completed all tests ---")
 

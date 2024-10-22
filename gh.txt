@@ -1,0 +1,224 @@
+Server listening on 10.0.0.1:6555
+Waiting for client connection...
+Connection established with client ('10.0.0.2', 36136)
+Sent packet 0
+Sent packet 1
+Sent packet 2
+Sent packet 3
+Sent packet 4
+Sent packet 5
+Sent packet 6
+Sent packet 7
+Sent packet 8
+Sent packet 9
+3.0
+Received cumulative ACK for packet 1
+Sent packet 10
+2.291043281555176
+Received duplicate ACK for packet 1, count=0
+2.291043281555176
+Received cumulative ACK for packet 2
+Sent packet 11
+1.7557721436023712
+Received cumulative ACK for packet 3
+Sent packet 12
+1.3510175980627537
+Received duplicate ACK for packet 3, count=1
+1.3510175980627537
+Received cumulative ACK for packet 4
+Sent packet 13
+1.0446602343581617
+Received cumulative ACK for packet 5
+Sent packet 14
+0.8124719958868809
+Received cumulative ACK for packet 6
+Sent packet 15
+0.6361160248852684
+Received cumulative ACK for packet 7
+Sent packet 16
+0.5018739474589893
+Received cumulative ACK for packet 8
+Sent packet 17
+0.39947702241204297
+Received cumulative ACK for packet 9
+Sent packet 18
+0.3212554662286067
+Received cumulative ACK for packet 10
+Sent packet 19
+0.2612979113462952
+Received cumulative ACK for packet 11
+Sent packet 20
+0.2134182129767439
+Received cumulative ACK for packet 12
+Sent packet 21
+0.17653909755500574
+Received cumulative ACK for packet 13
+Sent packet 22
+0.1480693614933256
+Received cumulative ACK for packet 14
+Sent packet 23
+0.12591750984016448
+Received cumulative ACK for packet 15
+Sent packet 24
+0.10870435216315394
+Received cumulative ACK for packet 16
+Sent packet 25
+0.0953288788639862
+Received cumulative ACK for packet 17
+Sent packet 26
+0.08484603771272506
+Received cumulative ACK for packet 18
+Sent packet 27
+0.07659746454825667
+Received cumulative ACK for packet 19
+Sent packet 28
+0.07011181949454899
+Received cumulative ACK for packet 20
+Sent packet 29
+0.0649445930624972
+Received cumulative ACK for packet 21
+Sent packet 30
+0.06078108453692839
+Received cumulative ACK for packet 22
+Sent packet 31
+0.05749497038279108
+Received cumulative ACK for packet 23
+Sent packet 32
+0.05482993807930379
+Received cumulative ACK for packet 24
+Sent packet 33
+0.052801543609168354
+Received cumulative ACK for packet 25
+Sent packet 34
+0.051004810100170835
+Received cumulative ACK for packet 26
+Sent packet 35
+0.049501143934397585
+Received cumulative ACK for packet 27
+Sent packet 36
+0.04824431786669858
+Received cumulative ACK for packet 28
+Sent packet 37
+0.047178400120946665
+Received cumulative ACK for packet 29
+Sent packet 38
+0.04619411139346105
+Received cumulative ACK for packet 30
+Sent packet 39
+0.04545868935384909
+Received cumulative ACK for packet 31
+Sent packet 40
+0.04517493534601273
+Received cumulative ACK for packet 32
+Sent packet 41
+0.04491880991082962
+Received cumulative ACK for packet 33
+Sent packet 42
+0.04461506634897072
+Received cumulative ACK for packet 34
+Sent packet 43
+0.04415122299726526
+Received cumulative ACK for packet 35
+Sent packet 44
+0.04370902990816465
+Received cumulative ACK for packet 36
+Sent packet 45
+0.04327174418634061
+Received cumulative ACK for packet 37
+Sent packet 46
+0.04289787297892661
+Received cumulative ACK for packet 38
+Sent packet 47
+0.04260316943765841
+Received cumulative ACK for packet 39
+Sent packet 48
+0.04224730553072272
+Received cumulative ACK for packet 40
+Sent packet 49
+0.04188956834602408
+Received cumulative ACK for packet 41
+Sent packet 50
+0.04157863113672892
+Received cumulative ACK for packet 42
+Sent packet 51
+0.041342418766289205
+Received cumulative ACK for packet 43
+Sent packet 52
+0.04117810851440503
+Received cumulative ACK for packet 44
+Sent packet 53
+0.04107168582142054
+Received cumulative ACK for packet 45
+Sent packet 54
+0.04099832079029801
+Received cumulative ACK for packet 46
+Sent packet 55
+0.04094184210368611
+Received cumulative ACK for packet 47
+Sent packet 56
+0.04093260191965132
+Received cumulative ACK for packet 48
+Sent packet 57
+0.040922881483018564
+Received cumulative ACK for packet 49
+Sent packet 58
+0.04094353311193743
+Received cumulative ACK for packet 50
+Sent packet 59
+0.040983806321597684
+Received cumulative ACK for packet 51
+Sent packet 60
+0.04098656466520964
+Received cumulative ACK for packet 52
+Sent packet 61
+0.040944728491697585
+Received cumulative ACK for packet 53
+Sent packet 62
+0.04113551550648582
+Received cumulative ACK for packet 54
+Sent packet 63
+0.04127107685568289
+Received cumulative ACK for packet 55
+Sent packet 64
+0.04138719305869847
+Received cumulative ACK for packet 56
+Sent packet 65
+0.04147426121675404
+Received cumulative ACK for packet 57
+Sent packet 66
+0.04151191151193137
+Received cumulative ACK for packet 58
+Sent packet 67
+0.04155419114249398
+Received cumulative ACK for packet 59
+Sent packet 68
+0.04218264833087378
+Received cumulative ACK for packet 60
+Sent packet 69
+0.04256695598250737
+Received cumulative ACK for packet 61
+Sent packet 70
+0.04251016503242429
+Received cumulative ACK for packet 62
+Sent packet 71
+0.04236580463968094
+Received cumulative ACK for packet 63
+0.042375912226283376
+Received cumulative ACK for packet 64
+0.042388211808309574
+Received cumulative ACK for packet 65
+0.04229099145875536
+Received cumulative ACK for packet 66
+0.042217517704522436
+Received cumulative ACK for packet 67
+0.042001453103392344
+Received cumulative ACK for packet 68
+0.04185833552809175
+Received cumulative ACK for packet 69
+0.041713619659198155
+Received cumulative ACK for packet 70
+0.04162967969640804
+Received cumulative ACK for packet 71
+0.041370839104017273
+Received cumulative ACK for packet 72
+File transfer complete

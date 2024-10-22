@@ -10,7 +10,11 @@ ALPHA=0.125
 BETA=0.25
 ESTIMATED_RTT=0
 DEV_RTT=BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
-timeout = ESTIMATED_RTT+4*DEV_RTT  # Initialize timeout to some value but update it as ACK packets arrive
+timeout = 1.0 # Initialize timeout to some value but update it as ACK packets arrive
+import sys
+sys.stdout.reconfigure(line_buffering=True)
+    
+    
 def update_timeout():
     global ESTIMATED_RTT,ALPHA,SAMPLE_RTT,DEV_RTT,BETA,timeout
     ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
@@ -26,12 +30,22 @@ def receive_file(server_ip, server_port):
     ## Add logic for handling packet loss while establishing connection
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.settimeout(2)  # Set timeout for server response
-
+    no_of_timeout=0
     server_address = (server_ip, server_port)
     expected_seq_num = 0
     output_file_path = "received_file.txt"  # Default file name
     k=0
-
+    packet_info = {
+        'signal': "RECEIVE",
+            # Convert bytes to string for JSON serialization
+    }
+    
+    # Convert the packet_info dictionary to a JSON string and append a newline
+    json_packet = json.dumps(packet_info)
+    json_packet+="<EOP>"
+    
+    
+    receive_packet = json_packet.encode() 
     packet_info = {
             'signal': "START",
                 # Convert bytes to string for JSON serialization
@@ -43,31 +57,8 @@ def receive_file(server_ip, server_port):
     
     
     start_packet = json_packet.encode() 
-    while True:
-        try:
-            client_socket.sendto(start_packet, server_address)
-            packet_data, _ = client_socket.recvfrom(MSS + 100) 
-            start=packet_data.decode().split('<EOP>')
-            sign=find_signal(start[0])
-            if sign=="CONNECT":
-                print(f"Connection established with server")
-                packet_info = {
-                    'signal': "RECEIVE",
-                        # Convert bytes to string for JSON serialization
-                }
-                
-                # Convert the packet_info dictionary to a JSON string and append a newline
-                json_packet = json.dumps(packet_info)
-                json_packet+="<EOP>"
-                
-                
-                receive_packet = json_packet.encode() 
-                client_socket.sendto(receive_packet, server_address)
-
-
-                break
-        except socket.timeout:
-            print("waiting for reply")
+    start_bool=True
+    
 
     with open(output_file_path, 'wb') as file:
         
@@ -84,16 +75,16 @@ def receive_file(server_ip, server_port):
                 packet_data, _ = client_socket.recvfrom(MSS + 100)  # Allow room for headers
 
                 packets = packet_data.decode().split('<EOP>')
-             
+                if start_bool:
+                    print("Connection setup")
+                    start_bool=False
                 for packet in packets[:-1]:
                     
                     # Logic to handle end of file
                   
                     end_signal=find_signal(packet)
-                    if end_signal=="CONNECT":
-                        client_socket.sendto(receive_packet, server_address)
-                        break
-
+                  
+                    
                     if end_signal=="END" :
                         while expected_seq_num in buffer:
                             file.write(buffer.pop(expected_seq_num))  # Write the next in-order packet from the buffer
@@ -106,7 +97,7 @@ def receive_file(server_ip, server_port):
                    
                     seq_num, data = parse_packet(packet)
            
-                    # print(f"received seq num {seq_num}")
+                
                     # If the packet is in order, write it to the file
                     if seq_num == expected_seq_num:
                         file.write(data)
@@ -121,21 +112,23 @@ def receive_file(server_ip, server_port):
                             send_ack(client_socket, server_address, expected_seq_num)
                     elif seq_num < expected_seq_num:
                         # Duplicate or old packet, send ACK again
-                        send_ack(client_socket, server_address, seq_num)
+                        send_ack(client_socket, server_address, expected_seq_num)
                     else:
-                        # packet arrived out of order
-                        # handle_pkt()
                         buffer[seq_num] = data  # Store the packet's data in the buffer
                         print(f"Out-of-order packet {seq_num}, buffering it")
                     
                         send_ack(client_socket, server_address, expected_seq_num)
 
-
+                no_of_timeout=0
                 k+=1
 
             except socket.timeout:
-                update_timeout()
+                if start_bool:
+                    client_socket.sendto(start_packet, server_address)
+
+
                 print("Timeout waiting for data")
+
 
     client_socket.close()
                 
@@ -189,5 +182,6 @@ parser.add_argument('server_port', type=int, help='Port number of the server')
 args = parser.parse_args()
 
 # Run the client
+
 receive_file(args.server_ip, args.server_port)
 
