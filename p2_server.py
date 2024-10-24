@@ -13,10 +13,8 @@ FILE_PATH = "input_file.txt"
  # Initialize timeout to some value but update it as ACK packets arrive
 congestion_control={
     "cwnd":1,
-    "ca_mult_dec_factor":0.5,
-    "ca_add_inc_factor":1,
+    "dec_factor":2,
     "ssthres":1000,
-    "ss_mul_fac":2
 }
 import sys
 sys.stdout.reconfigure(line_buffering=True)
@@ -69,6 +67,7 @@ def send_file(server_ip, server_port):
 
         isTrue=True
         eof=False
+        mode=Mode.slow_start
         while True:
             while len(unacked_packets)<congestion_control['cwnd']: ## Use window-based sending
                 chunk = file.read(MSS)
@@ -147,8 +146,7 @@ def send_file(server_ip, server_port):
                         congestion_control["cwnd"]=congestion_control["cwnd"]+1
                         if(congestion_control["cwnd"]>=congestion_control["ssthres"]):
                             mode=Mode.congestion_avoidance
-                    elif(mode==Mode.congestion_avoidance):          
-                        #clarify          
+                    elif(mode==Mode.congestion_avoidance):       
                         congestion_control['cwnd']=congestion_control["cwnd"]+1/congestion_control["cwnd"]
                         if(congestion_control["cwnd"]<congestion_control["ssthres"]):
                             mode=Mode.slow_start
@@ -165,14 +163,14 @@ def send_file(server_ip, server_port):
                     if(mode==Mode.slow_start):
                         duplicate_ack_count+=1
                         if(duplicate_ack_count==DUP_ACK_THRESHOLD):
-                            congestion_control["ssthres"]=congestion_control["cwnd"]/2
+                            congestion_control["ssthres"]=congestion_control["cwnd"]/congestion_control['dec_factor']
                             congestion_control["cwnd"]=congestion_control["ssthres"]+DUP_ACK_THRESHOLD
                             mode=Mode.fast_recovery
                             fast_retransmit(server_socket, client_address, unacked_packets)
                     elif(mode==Mode.congestion_avoidance):
                         duplicate_ack_count+=1
                         if(duplicate_ack_count==DUP_ACK_THRESHOLD):
-                            congestion_control["ssthres"]=congestion_control["cwnd"]/2
+                            congestion_control["ssthres"]=congestion_control["cwnd"]/congestion_control['dec_factor']
                             congestion_control["cwnd"]=congestion_control["ssthres"]+DUP_ACK_THRESHOLD
                             mode=Mode.fast_recovery
                             fast_retransmit(server_socket, client_address, unacked_packets)
@@ -187,14 +185,14 @@ def send_file(server_ip, server_port):
                 # update_timeout()
                 
                 print("Timeout occurred, retransmitting unacknowledged packets")
-                print(len(unacked_packets))
                 fast_retransmit(server_socket, client_address, unacked_packets)
-                congestion_control["ssthres"]=congestion_control["cwnd"]/2
+                congestion_control["ssthres"]=congestion_control["cwnd"]/congestion_control['dec_factor']
                 congestion_control["cwnd"]=1
                 duplicate_ack_count=0
                 mode=Mode.slow_start
             # Check if we are done sending the file
     server_socket.close()
+    print(" Socket closed ")
 
 def process_buffer(buffer):
     """
