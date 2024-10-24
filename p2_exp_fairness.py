@@ -112,14 +112,17 @@ def run():
             for log_file in log_files:
                 if os.path.exists(log_file):
                     os.remove(log_file)
-                    print(f"Removed old log file: {log_file}")
+                    if os.path.exists(log_file):
+                        print(f"Unable to remove old log file: {log_file}")
+                    else:
+                        print(f"Removed old log file: {log_file}")
                 else:
                     print(f"No old log file found for: {log_file}")
             
-            s1_cmd = f"python3 p2_server.py {SERVER_IP1} {SERVER_PORT1} > server1_output.log 2>&1  &"
-            s2_cmd = f"python3 p2_server.py {SERVER_IP2} {SERVER_PORT2} > server2_output.log 2>&1  &"
-            c1_cmd = f"python3 p2_client.py {SERVER_IP1} {SERVER_PORT1} --pref_outfile {pref_c1} > client1_output.log 2>&1 &"
-            c2_cmd = f"python3 p2_client.py {SERVER_IP2} {SERVER_PORT2} --pref_outfile {pref_c2} > client2_output.log 2>&1  &"
+            s1_cmd = f"python3 p2_server.py {SERVER_IP1} {SERVER_PORT1} >> server1_output.log 2>&1 &"
+            s2_cmd = f"python3 p2_server.py {SERVER_IP2} {SERVER_PORT2} >> server2_output.log 2>&1 &"
+            c1_cmd = f"python3 p2_client.py {SERVER_IP1} {SERVER_PORT1} --pref_outfile {pref_c1} >> client1_output.log 2>&1 &"
+            c2_cmd = f"python3 p2_client.py {SERVER_IP2} {SERVER_PORT2} --pref_outfile {pref_c2} >> client2_output.log 2>&1 &"
 
             s1_pid = s1.cmd(s1_cmd)
             s2_pid = s2.cmd(s2_cmd)
@@ -134,7 +137,7 @@ def run():
                     continue
                 else:
                     c1_pid = c1_pid_raw.split()[-1]
-                    print("started client 1 with PID: {c1_pid}")
+                    print(f"started client 1 with PID: {c1_pid}")
                     break
             
             start_time_c2 = time.time()

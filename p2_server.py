@@ -29,7 +29,7 @@ def send_file(server_ip, server_port):
     Send a predefined file to the client, ensuring reliability over UDP.
     """
     # Initialize UDP socket
-
+    print("Starting new server")
     SAMPLE_RTT=0.05
     ALPHA=0.125
     BETA=0.25
@@ -54,6 +54,7 @@ def send_file(server_ip, server_port):
             
             if sign=="START":
                 print(f"Connection established with client {client_address}")
+                print(time.time())
                 break
                  
         except socket.timeout:
