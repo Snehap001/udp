@@ -84,22 +84,17 @@ def receive_file(server_ip, server_port):
                   
                     end_signal=find_signal(packet)
                   
-                    
-                    if end_signal=="END" :
-                        while expected_seq_num in buffer:
-                            file.write(buffer.pop(expected_seq_num))  # Write the next in-order packet from the buffer
-                            print(f"Buffered packet {expected_seq_num}, writing to file")
-                            expected_seq_num += 1
-                        print("Received END signal from server, file transfer complete")
-                        file_transfer_ongoing=False
-                        client_socket.sendto(receive_packet, server_address)
-                        break
-                   
                     seq_num, data = parse_packet(packet)
            
                 
                     # If the packet is in order, write it to the file
                     if seq_num == expected_seq_num:
+                        if end_signal=="END" :
+                            
+                            print("Received END signal from server, file transfer complete")
+                            file_transfer_ongoing=False
+                            client_socket.sendto(receive_packet, server_address)
+                            break
                         file.write(data)
                         print(f"Received packet {seq_num}, writing to file")
                         expected_seq_num+=1

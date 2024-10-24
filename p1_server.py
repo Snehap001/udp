@@ -86,6 +86,8 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                 packet_info = {
                         'signal': "END",
                           # Convert bytes to string for JSON serialization
+                          'seq_num':seq_num,
+                          'data':"END"
                 }
                 
                 # Convert the packet_info dictionary to a JSON string and append a newline
