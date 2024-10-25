@@ -147,6 +147,7 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                         print("Entering fast recovery mode")
                         
                         fast_recovery(server_socket,client_address,unacked_packets)
+                        duplicate_ack_count=0
                         
                     
 
@@ -156,6 +157,7 @@ def send_file(server_ip, server_port, enable_fast_recovery):
                 
                 print("Timeout occurred, retransmitting unacknowledged packets")
                 print(len(unacked_packets))
+                duplicate_ack_count=0
                 retransmit_unacked_packets(server_socket, client_address, unacked_packets)
 
             # Check if we are done sending the file
