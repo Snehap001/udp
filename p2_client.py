@@ -28,6 +28,8 @@ def receive_file(server_ip, server_port,pref_outfile):
     # Initialize UDP socket
     
     ## Add logic for handling packet loss while establishing connection
+    print("Starting new client")
+    print(time.time())
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.settimeout(2)  # Set timeout for server response
     no_of_timeout=0
@@ -125,13 +127,16 @@ def receive_file(server_ip, server_port,pref_outfile):
             except socket.timeout:
                 if start_bool:
                     client_socket.sendto(start_packet, server_address)
-
-
-                print("Timeout waiting for data")
+                    print("Timeout waiting for connection")
+                    print(time.time())
+                else:
+                    print("Timeout waiting for data")
+                    print(time.time())
 
 
     client_socket.close()
     print("Socket closed")
+    print(time.time())
                 
 def find_signal(packet):
     
@@ -145,6 +150,7 @@ def parse_packet(packet):
     
     # Load the JSON data
     packet_info = json.loads(packet)
+    print(" Packet received ")
     print(packet_info)
     seq_num = packet_info['seq_num']
     data=packet_info['data'].encode()
