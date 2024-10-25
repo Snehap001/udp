@@ -112,10 +112,7 @@ def run():
             for log_file in log_files:
                 if os.path.exists(log_file):
                     os.remove(log_file)
-                    if os.path.exists(log_file):
-                        print(f"Unable to remove old log file: {log_file}")
-                    else:
-                        print(f"Removed old log file: {log_file}")
+                    print(f"Removed old log file: {log_file}")
                 else:
                     print(f"No old log file found for: {log_file}")
             
@@ -127,30 +124,27 @@ def run():
             s1_pid = s1.cmd(s1_cmd)
             s2_pid = s2.cmd(s2_cmd)
             time.sleep(1)
-            
+                        
+            s1_pid = s1.cmd(s1_cmd)
+            s2_pid = s2.cmd(s2_cmd)
+            time.sleep(1)
             start_time_c1 = time.time()
-            c1_pid = ""
-            c2_pid = ""
-            while True:
-                c1_pid_raw = c1.cmd(c1_cmd).strip()
-                if len(c1_pid_raw.split()) == 0:
-                    continue
-                else:
-                    c1_pid = c1_pid_raw.split()[-1]
-                    print(f"started client 1 with PID: {c1_pid}")
-                    break
-            
+            c1.cmd(c1_cmd)
+            print(f"Client 1 command executed")
+            c1_pid_raw = c1.cmd('ps').strip()
+            print(f"Checking PID: {c1_pid_raw}")
+            pid_parts = c1_pid_raw.split()
+            c1_pid = pid_parts[-8]
+            print(f"Started client 1 with PID: {c1_pid}")
             start_time_c2 = time.time()
+            c2_pid=c2.cmd(c2_cmd)
+            print(f"Client 2 command executed")
+            c2_pid_raw = c2.cmd('ps').strip()
+            print(f"Checking PID: {c2_pid_raw}")
+            pid_parts = c2_pid_raw.split()  
+            c2_pid = pid_parts[-8]
+            print(f"Started client 2 with PID: {c2_pid}")
 
-            while True:
-                c2_pid_raw = c2.cmd(c2_cmd).strip()
-                if len(c2_pid_raw.split()) == 0:
-                    continue
-                else:
-                    c2_pid = c2_pid_raw.split()[-1]
-                    print(f"started client 2 with PID: {c2_pid}")
-                    break
-            
             #CLI(net)
             end_time_c1 = None
             end_time_c2 = None
