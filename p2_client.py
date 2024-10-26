@@ -28,8 +28,6 @@ def receive_file(server_ip, server_port,pref_outfile):
     # Initialize UDP socket
     
     ## Add logic for handling packet loss while establishing connection
-    print("Starting new client")
-    print(time.time())
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.settimeout(2)  # Set timeout for server response
     no_of_timeout=0
@@ -75,7 +73,7 @@ def receive_file(server_ip, server_port,pref_outfile):
                 
                 # Receive the packet
                 packet_data, _ = client_socket.recvfrom(MSS + 100)  # Allow room for headers
-
+                print(f"len_data : {len(packet_data)}")                  
                 packets = packet_data.decode().split('<EOP>')
                 if start_bool:
                     print("Connection setup")
@@ -85,8 +83,6 @@ def receive_file(server_ip, server_port,pref_outfile):
                     # Logic to handle end of file
                   
                     end_signal=find_signal(packet)
-                  
-                    
                     if end_signal=="END" :
                         while expected_seq_num in buffer:
                             file.write(buffer.pop(expected_seq_num))  # Write the next in-order packet from the buffer
@@ -128,15 +124,12 @@ def receive_file(server_ip, server_port,pref_outfile):
                 if start_bool:
                     client_socket.sendto(start_packet, server_address)
                     print("Timeout waiting for connection")
-                    print(time.time())
                 else:
                     print("Timeout waiting for data")
-                    print(time.time())
+                    send_ack(client_socket, server_address, expected_seq_num)
 
 
     client_socket.close()
-    print("Socket closed")
-    print(time.time())
                 
 def find_signal(packet):
     
@@ -150,8 +143,6 @@ def parse_packet(packet):
     
     # Load the JSON data
     packet_info = json.loads(packet)
-    print(" Packet received ")
-    print(packet_info)
     seq_num = packet_info['seq_num']
     data=packet_info['data'].encode()
     return seq_num, data

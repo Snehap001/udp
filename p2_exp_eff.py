@@ -66,73 +66,76 @@ def run(expname):
         loss_list = [1]
     print(loss_list, delay_list)
     
+    LOSS=20
+    DELAY=20
+
     # Loop to create the topology 10 times with varying loss (1% to 10%)
-    for LOSS in loss_list:
-        for DELAY in delay_list:
-            for i in range(0, NUM_ITERATIONS):
-                print(f"\n--- Running topology with {LOSS}% packet loss, {DELAY}ms delay")
+    # for LOSS in loss_list:
+    #     for DELAY in delay_list:
+    #         for i in range(0, NUM_ITERATIONS):
+    print(f"\n--- Running topology with {LOSS}% packet loss, {DELAY}ms delay")
 
-                # Create the custom topology with the specified loss
-                topo = CustomTopo(loss=LOSS, delay=DELAY)
+    # Create the custom topology with the specified loss
+    topo = CustomTopo(loss=LOSS, delay=DELAY)
 
-                # Initialize the network with the custom topology and TCLink for link configuration
-                net = Mininet(topo=topo, link=TCLink, controller=None)
-                # Add the remote controller to the network
-                remote_controller = RemoteController('c0', ip=controller_ip, port=controller_port)
-                net.addController(remote_controller)
+    # Initialize the network with the custom topology and TCLink for link configuration
+    net = Mininet(topo=topo, link=TCLink, controller=None)
+    # Add the remote controller to the network
+    remote_controller = RemoteController('c0', ip=controller_ip, port=controller_port)
+    net.addController(remote_controller)
 
-                # Start the network
-                net.start()
+    # Start the network
+    net.start()
 
-                # Get references to h1 and h2
-                h1 = net.get('h1')
-                h2 = net.get('h2')
+    # Get references to h1 and h2
+    h1 = net.get('h1')
+    h2 = net.get('h2')
 
-                log_files = ["server_output.log",  "client_output.log"]
+    log_files = ["server_output.log",  "client_output.log"]
 
-                # Remove old log files if they exist
-                for log_file in log_files:
-                    if os.path.exists(log_file):
-                        os.remove(log_file)
-                        print(f"Removed old log file: {log_file}")
-                    else:
-                        print(f"No old log file found for: {log_file}")            
+    # Remove old log files if they exist
+    for log_file in log_files:
+        if os.path.exists(log_file):
+            os.remove(log_file)
+            print(f"Removed old log file: {log_file}")
+        else:
+            print(f"No old log file found for: {log_file}")            
 
-                start_time = time.time()
-                
-                h1.cmd(f"python3 p2_server.py {SERVER_IP} {SERVER_PORT} > server_output.log 2>&1 &")
-                result = h2.cmd(f"python3 p2_client.py {SERVER_IP} {SERVER_PORT} > client_output.log 2>&1")
-                end_time = time.time()
-                ttc = end_time-start_time
-                md5_hash = compute_md5('received_file.txt')
-                # write the result to a file
-                bytes_transferred=0 
-                with open("server_output.log", "r") as file:
-                    for line in file:
-                        # Check if the line starts with 'len_data'
-                        if line.startswith("len_data"):
-                            # Split the line to extract the number after "len_data :"
-                            parts = line.split(":")
-                            # Convert the second part to an integer and add it to the total
-                            number = int(parts[1].strip())
-                            bytes_transferred += number
-                with open("client_output.log", "r") as file:
-                    for line in file:
-                        # Check if the line starts with 'len_data'
-                        if line.startswith("len_data"):
-                            # Split the line to extract the number after "len_data :"
-                            parts = line.split(":")
-                            # Convert the second part to an integer and add it to the total
-                            number = int(parts[1].strip())
-                            bytes_transferred += number
-                throughput=bytes_transferred/ttc
-                f_out.write(f"{LOSS},{DELAY},{md5_hash},{throughput}\n")
+    start_time = time.time()
+    
+    h1.cmd(f"python3 p2_server.py {SERVER_IP} {SERVER_PORT} > server_output.log 2>&1 &")
+    result = h2.cmd(f"python3 p2_client.py {SERVER_IP} {SERVER_PORT} > client_output.log 2>&1")
+    end_time = time.time()
+    ttc = end_time-start_time
+    md5_hash = compute_md5('received_file.txt')
+    # write the result to a file
+    bytes_transferred=0 
+    with open("server_output.log", "r") as file:
+        for line in file:
+            # Check if the line starts with 'len_data'
+            if line.startswith("len_data"):
+                # Split the line to extract the number after "len_data :"
+                parts = line.split(":")
+                # Convert the second part to an integer and add it to the total
+                number = int(parts[1].strip())
+                bytes_transferred += number
+    with open("client_output.log", "r") as file:
+        for line in file:
+            # Check if the line starts with 'len_data'
+            if line.startswith("len_data"):
+                # Split the line to extract the number after "len_data :"
+                parts = line.split(":")
+                # Convert the second part to an integer and add it to the total
+                number = int(parts[1].strip())
+                bytes_transferred += number
+    throughput=bytes_transferred/ttc
+    f_out.write(f"{LOSS},{DELAY},{md5_hash},{throughput}\n")
 
-                # Stop the network
-                net.stop()
+    # Stop the network
+    net.stop()
 
-                # Wait a moment before starting the next iteration
-                time.sleep(1)
+    # Wait a moment before starting the next iteration
+    time.sleep(1)
 
     print("\n--- Completed all tests ---")
 

@@ -29,7 +29,6 @@ def send_file(server_ip, server_port):
     Send a predefined file to the client, ensuring reliability over UDP.
     """
     # Initialize UDP socket
-    print("Starting new server")
     SAMPLE_RTT=0.05
     ALPHA=0.125
     BETA=0.25
@@ -51,10 +50,9 @@ def send_file(server_ip, server_port):
             data, client_address = server_socket.recvfrom(1024)
             data_packet=data.decode().split('<EOP>')
             sign=find_signal(data_packet[0])
-            
+            print(f"len_data : {len(data)}")            
             if sign=="START":
                 print(f"Connection established with client {client_address}")
-                print(time.time())
                 break
                  
         except socket.timeout:
@@ -66,13 +64,12 @@ def send_file(server_ip, server_port):
         duplicate_ack_count = 0
         last_ack_received = -1
 
-        isTrue=True
+
         eof=False
         mode=Mode.slow_start
         while True:
             while len(unacked_packets)<congestion_control['cwnd']: ## Use window-based sending
                 chunk = file.read(MSS)
-                start_time=time.time()
                 if not chunk :
                     # End of file
                     # Send end signal to the client 
@@ -82,16 +79,13 @@ def send_file(server_ip, server_port):
                 # Create and send the packet
                 packet = create_packet(seq_num, chunk)
 
-                
                 server_socket.sendto(packet, client_address)
-                
 
                 ## 
 
                 unacked_packets[seq_num] = (packet, time.time())  # Track sent packets
                 print(f"Sent packet {seq_num}")
                 seq_num += 1
-            print(f"len of unacked packets: {len(unacked_packets)} ")
             if eof and len(unacked_packets)==0:
                 packet_info = {
                         'signal': "END",
@@ -108,6 +102,7 @@ def send_file(server_ip, server_port):
                     server_socket.sendto(end_packet, client_address)
                     try:
                         packet_data, _ = server_socket.recvfrom(1024)
+                        print(f"len_data : {len(packet_data)}")
                         receive=packet_data.decode().split('<EOP>')
                         sign=find_signal(receive[0])
                         if sign=="RECEIVE":
@@ -122,6 +117,7 @@ def send_file(server_ip, server_port):
             
                 server_socket.settimeout(timeout)
                 ack_packet, _ = server_socket.recvfrom(1024)
+                print(f"len_data : {len(ack_packet)}")                
                 data_packet=ack_packet.decode().split('<EOP>')
                 sign=find_signal(data_packet[0])
                 if sign!="ACK":
@@ -137,12 +133,12 @@ def send_file(server_ip, server_port):
                         ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
                         DEV_RTT=(1-BETA)*DEV_RTT+BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
                         timeout=ESTIMATED_RTT+4*DEV_RTT
-                        print(timeout)
                     print(f"Received cumulative ACK for packet {ack_seq_num}")
                     for pk in range(last_ack_received,ack_seq_num):
                         if pk in unacked_packets:
                             del unacked_packets[pk]
                     last_ack_received = ack_seq_num
+                    duplicate_ack_count=0
                     if(mode==Mode.slow_start):
                         congestion_control["cwnd"]=congestion_control["cwnd"]+1
                         if(congestion_control["cwnd"]>=congestion_control["ssthres"]):
@@ -193,7 +189,6 @@ def send_file(server_ip, server_port):
                 mode=Mode.slow_start
             # Check if we are done sending the file
     server_socket.close()
-    print(" Socket closed ")
 
 def process_buffer(buffer):
     """
@@ -250,37 +245,7 @@ def create_packet(seq_num, data):
     # Convert the packet_info dictionary to a JSON string and append a newline
     json_packet = json.dumps(packet_info)
     json_packet+="<EOP>"
-    
     return json_packet.encode()  # Convert to bytes before sending
-
-def read_until_delimiter(sock, delimiter="<EOP>"):
-    """
-    Read from the socket buffer until the custom delimiter is encountered.
-    """
-    buffer = ''
-    while True:
-        # Receive data in chunks
-        chunk, _ = sock.recvfrom(1024)
-        buffer += chunk.decode()  # Decode to string and append to buffer
-        print(buffer)
-        
-        # Check if the custom delimiter is in buffer (end of one packet)
-        if delimiter in buffer:
-            # Split the buffer at the delimiter
-            packet, remaining_buffer = buffer.split(delimiter, 1)
-            
-            # Return the complete packet and the remaining buffer
-            return packet, remaining_buffer
-
-    
-
-def retransmit_unacked_packets(server_socket, client_address, unacked_packets):
-    """
-    Retransmit all unacknowledged packets.
-    """
-    for seq_num,(packet,time) in unacked_packets.items():
-        print(f"retransmitted packet: {seq_num}")
-        server_socket.sendto(packet, client_address)
     
 
 def fast_retransmit(server_socket, client_address, unacked_packets):
@@ -290,7 +255,6 @@ def fast_retransmit(server_socket, client_address, unacked_packets):
     min_seq_num=min(unacked_packets)
     packet,_=unacked_packets[min_seq_num]
     server_socket.sendto(packet, client_address)
-
 
 
     
