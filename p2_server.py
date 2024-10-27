@@ -16,6 +16,14 @@ congestion_control={
     "dec_factor":2,
     "ssthres":1000,
 }
+#Contains the state of the retransmission timer
+rtt={
+    'alpha':0.125,
+    'beta':0.25,
+    'k':4,
+    'est_rtt':-1,
+    'dev_rtt':-1
+}
 import sys
 sys.stdout.reconfigure(line_buffering=True)
 def find_signal(packet):
@@ -29,12 +37,9 @@ def send_file(server_ip, server_port):
     Send a predefined file to the client, ensuring reliability over UDP.
     """
     # Initialize UDP socket
-    SAMPLE_RTT=0.05
-    ALPHA=0.125
-    BETA=0.25
-    ESTIMATED_RTT=0.025
-    DEV_RTT=BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
-    timeout = ESTIMATED_RTT+4*DEV_RTT 
+
+    timeout=1
+
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_socket.bind((server_ip, server_port))
 
@@ -64,10 +69,10 @@ def send_file(server_ip, server_port):
         duplicate_ack_count = 0
         last_ack_received = -1
 
-
         eof=False
         mode=Mode.slow_start
         while True:
+            num_pack_sent=0
             while len(unacked_packets)<congestion_control['cwnd']: ## Use window-based sending
                 chunk = file.read(MSS)
                 if not chunk :
@@ -86,6 +91,7 @@ def send_file(server_ip, server_port):
                 unacked_packets[seq_num] = (packet, time.time())  # Track sent packets
                 print(f"Sent packet {seq_num}")
                 seq_num += 1
+                num_pack_sent+=1
             if eof and len(unacked_packets)==0:
                 packet_info = {
                         'signal': "END",
@@ -117,22 +123,30 @@ def send_file(server_ip, server_port):
             
                 server_socket.settimeout(timeout)
                 ack_packet, _ = server_socket.recvfrom(1024)
+                end_time=time.time()
                 print(f"len_data : {len(ack_packet)}")                
                 data_packet=ack_packet.decode().split('<EOP>')
                 sign=find_signal(data_packet[0])
                 if sign!="ACK":
                     continue
                 ack_seq_num = process_buffer(ack_packet)
-                end_time=time.time()
-                
-                
+                min_seq_num=seq_num-num_pack_sent
+                if(((ack_seq_num-1)>=min_seq_num) and (num_pack_sent>0)):
+                    if(rtt["est_rtt"]==(-1)):
+                        SAMPLE_RTT=end_time-unacked_packets[min_seq_num][1]
+                        rtt['est_rtt']=SAMPLE_RTT
+                        rtt['dev_rtt']=SAMPLE_RTT/2
+                        print("timeout calculated")
+                    else:
+                        SAMPLE_RTT=end_time-unacked_packets[min_seq_num][1]
+                        rtt['dev_rtt']=(1-rtt['beta'])*rtt['dev_rtt']+rtt['beta']*(abs(SAMPLE_RTT-rtt['est_rtt']))
+                        rtt['est_rtt']=(1-rtt['alpha'])*rtt['est_rtt']+rtt['alpha']*SAMPLE_RTT
+                if(rtt["est_rtt"]==(-1)):
+                    timeout=1
+                else:
+                    timeout = max(rtt['est_rtt'] + rtt['k'] * rtt['dev_rtt'], 0.001)
+                print(f'New timeout : {timeout}')                 
                 if ack_seq_num > last_ack_received:
-                    if ack_seq_num-1 in unacked_packets:
-                        
-                        SAMPLE_RTT=end_time-unacked_packets[ack_seq_num-1][1]
-                        ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
-                        DEV_RTT=(1-BETA)*DEV_RTT+BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
-                        timeout=ESTIMATED_RTT+4*DEV_RTT
                     print(f"Received cumulative ACK for packet {ack_seq_num}")
                     for pk in range(last_ack_received,ack_seq_num):
                         if pk in unacked_packets:
@@ -179,7 +193,6 @@ def send_file(server_ip, server_port):
 
             except socket.timeout:
                 # Timeout handling: retransmit all unacknowledged packets
-                # update_timeout()
                 
                 print("Timeout occurred, retransmitting unacknowledged packets")
                 fast_retransmit(server_socket, client_address, unacked_packets)
@@ -187,6 +200,8 @@ def send_file(server_ip, server_port):
                 congestion_control["cwnd"]=1
                 duplicate_ack_count=0
                 mode=Mode.slow_start
+                timeout=timeout*2
+                print(f'New timeout : {timeout}')
             # Check if we are done sending the file
     server_socket.close()
 
@@ -255,7 +270,6 @@ def fast_retransmit(server_socket, client_address, unacked_packets):
     min_seq_num=min(unacked_packets)
     packet,_=unacked_packets[min_seq_num]
     server_socket.sendto(packet, client_address)
-
 
     
 
