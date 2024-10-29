@@ -20,7 +20,7 @@ plt.grid(True)
 plt.savefig('p2_fairness.png')
 
 # Load the data from a CSV file
-data = pd.read_csv('congcont_loss.csv')
+data = pd.read_csv('throughput_loss.csv')
 
 # Group by loss to calculate the average throughput for each loss value
 avg_throughput = data.groupby('loss')['throughput'].mean()/1000
@@ -42,7 +42,7 @@ plt.grid(True)
 plt.savefig("congcont_loss.png")
 
 # Load the data from a CSV file
-data = pd.read_csv('congcont_delay.csv')
+data = pd.read_csv('throughput_delay.csv')
 
 # Group by loss to calculate the average throughput for each loss value
 avg_throughput = data.groupby('delay')['throughput'].mean()/1000
