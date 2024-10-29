@@ -18,7 +18,8 @@ congestion_control={
     "W_max":1,
     "beta_cubic":0.5,
     "C":0.4,
-    "time":0
+    "time":0,
+    "timeout":False
     
 }
 #Contains the state of the retransmission timer
@@ -34,17 +35,21 @@ import sys
 sys.stdout.reconfigure(line_buffering=True)
 def w_est(congestion_control,RTT):
     t=time.time()-(congestion_control["time"])
-    w_max=congestion_control["w_max"]
+    w_max=congestion_control["W_max"]
     beta=congestion_control["beta_cubic"]
     return (w_max*beta) +(3*(1-beta)/(1+beta))*(t/RTT)
 
-def w_cubic(congestion_control,time):
+def w_cubic(congestion_control,time,k_value):
     t=time-(congestion_control["time"])
-    w_max=congestion_control["w_max"]
+    w_max=congestion_control["W_max"]
     beta=congestion_control["beta_cubic"]
     c=congestion_control["C"]
-    value=(w_max*(1-beta)/c)
-    k=pow(value,0.33)
+    if k_value==0:
+        
+        value=(w_max*(1-beta)/c)
+        k=pow(value,0.33)
+    else:
+        k=0
     return c*pow((t-k),3) + w_max
 def find_signal(packet):
     
@@ -183,20 +188,28 @@ def send_file(server_ip, server_port):
                             mode=Mode.congestion_avoidance
                             congestion_control["time"]=time.time()
                     elif(mode==Mode.congestion_avoidance):  
-                        cubic=w_cubic(congestion_control,time.time())
-                        est=w_est(congestion_control,SAMPLE_RTT)
+                        k=congestion_control["timeout"]==True
+                        if congestion_control["timeout"]==True:
+                            congestion_control["W_max"]=congestion_control["cwnd"]
+                            
+                            cubic=w_cubic(congestion_control,time.time(),k)
+                        else:
+                            cubic=w_cubic(congestion_control,time.time(),k)
+
+                        est=w_est(congestion_control,rtt["est_rtt"])
                         if cubic<est:
                             congestion_control["cwnd"]=est
                         elif congestion_control["cwnd"]<congestion_control["W_max"]:
                             cwnd=congestion_control["cwnd"]
-                            cubic_rtt=w_cubic(congestion_control,time.time()+SAMPLE_RTT)
+                            cubic_rtt=w_cubic(congestion_control,time.time()+rtt["est_rtt"],k)
                             congestion_control["cwnd"]=cwnd+((cubic_rtt-cwnd)/cwnd)
                         elif congestion_control["cwnd"]>=congestion_control["W_max"]:
                             cwnd=congestion_control["cwnd"]
-                            cubic_rtt=w_cubic(congestion_control,time.time()+SAMPLE_RTT)
+                            cubic_rtt=w_cubic(congestion_control,time.time()+rtt["est_rtt"],k)
                             congestion_control["cwnd"]=cwnd+((cubic_rtt-cwnd)/cwnd)
                         if(congestion_control["cwnd"]<congestion_control["ssthres"]):
                             mode=Mode.slow_start
+                            congestion_control["timeout"]=False
                     elif(mode==Mode.fast_recovery):
                         congestion_control['cwnd']=congestion_control['ssthres']
                         mode=Mode.congestion_avoidance
@@ -217,20 +230,21 @@ def send_file(server_ip, server_port):
                             fast_retransmit(server_socket, client_address, unacked_packets)
                     elif(mode==Mode.congestion_avoidance):
                         duplicate_ack_count+=1
-                        
+                        congestion_control["W_max"]=congestion_control["cwnd"]
+                        congestion_control["ssthres"]=congestion_control["cwnd"]*(congestion_control["beta_cubic"])
+                        congestion_control["ssthres"]=max(congestion_control["ssthres"],2)
+                        congestion_control["cwnd"]=congestion_control["cwnd"]*congestion_control["beta_cubic"]
                         if(duplicate_ack_count==DUP_ACK_THRESHOLD):
                             w_last_max=congestion_control["W_max"]
                             
-                            congestion_control["W_max"]=congestion_control["cwnd"]
-                            congestion_control["ssthres"]=congestion_control["cwnd"](congestion_control["beta_cubic"])
-                            congestion_control["ssthres"]=max(congestion_control["ssthres"],2)
-                            congestion_control["cwnd"]=congestion_control["cwnd"]*congestion_control["beta_cubic"]
+                            
                             mode=Mode.fast_recovery
-                            if congestion_control["W_max"]<w_last_max:
-                                w_last_max=congestion_control["W_max"]
-                                congestion_control["W_max"]=congestion_control["W_max"]*(1.0+congestion_control["beta_cubic"])/2.0
-                            else:
-                                w_last_max=congestion_control["W_max"]
+                            congestion_control["timeout"]=False
+                            # if congestion_control["W_max"]<w_last_max:
+                            #     w_last_max=congestion_control["W_max"]
+                            #     congestion_control["W_max"]=congestion_control["W_max"]*(1.0+congestion_control["beta_cubic"])/2.0
+                            # else:
+                            #     w_last_max=congestion_control["W_max"]
                             fast_retransmit(server_socket, client_address, unacked_packets)
                     elif(mode==Mode.fast_recovery):
                         congestion_control["cwnd"]=congestion_control["cwnd"]+1
@@ -243,12 +257,18 @@ def send_file(server_ip, server_port):
                 
                 print("Timeout occurred, retransmitting unacknowledged packets")
                 fast_retransmit(server_socket, client_address, unacked_packets)
-                congestion_control["ssthres"]=congestion_control["cwnd"](congestion_control["beta_cubic"])
-                congestion_control["ssthres"]=max(congestion_control["ssthres"],2)
-                congestion_control["cwnd"]=1
+                if (mode==Mode.congestion_avoidance):
+                    congestion_control["ssthres"]=congestion_control["cwnd"]*(congestion_control["beta_cubic"])
+                    congestion_control["ssthres"]=max(congestion_control["ssthres"],2)
+                    congestion_control["cwnd"]=1
+                else:
+                    congestion_control["ssthres"]=congestion_control["cwnd"]/congestion_control['dec_factor']
+                    congestion_control["cwnd"]=1
+
                 duplicate_ack_count=0
                 mode=Mode.slow_start
-                timeout=timeout*2
+                timeout=min(timeout*2,10)
+                congestion_control["timeout"]=True
                 print(f'New timeout : {timeout}')
             # Check if we are done sending the file
     server_socket.close()
