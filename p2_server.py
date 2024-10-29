@@ -72,7 +72,6 @@ def send_file(server_ip, server_port):
         eof=False
         mode=Mode.slow_start
         while True:
-            num_pack_sent=0
             while len(unacked_packets)<congestion_control['cwnd']: ## Use window-based sending
                 chunk = file.read(MSS)
                 if not chunk :
@@ -88,14 +87,15 @@ def send_file(server_ip, server_port):
 
                 ## 
 
-                unacked_packets[seq_num] = (packet, time.time())  # Track sent packets
+                unacked_packets[seq_num] = [packet, time.time(),False]  # Track sent packets
                 print(f"Sent packet {seq_num}")
                 seq_num += 1
-                num_pack_sent+=1
             if eof and len(unacked_packets)==0:
                 packet_info = {
                         'signal': "END",
                           # Convert bytes to string for JSON serialization
+                          'seq_num':seq_num,
+                          'data':"END"
                 }
                 
                 # Convert the packet_info dictionary to a JSON string and append a newline
@@ -130,17 +130,6 @@ def send_file(server_ip, server_port):
                 if sign!="ACK":
                     continue
                 ack_seq_num = process_buffer(ack_packet)
-                min_seq_num=seq_num-num_pack_sent
-                if(((ack_seq_num-1)>=min_seq_num) and (num_pack_sent>0)):
-                    if(rtt["est_rtt"]==(-1)):
-                        SAMPLE_RTT=end_time-unacked_packets[min_seq_num][1]
-                        rtt['est_rtt']=SAMPLE_RTT
-                        rtt['dev_rtt']=SAMPLE_RTT/2
-                        print("timeout calculated")
-                    else:
-                        SAMPLE_RTT=end_time-unacked_packets[min_seq_num][1]
-                        rtt['dev_rtt']=(1-rtt['beta'])*rtt['dev_rtt']+rtt['beta']*(abs(SAMPLE_RTT-rtt['est_rtt']))
-                        rtt['est_rtt']=(1-rtt['alpha'])*rtt['est_rtt']+rtt['alpha']*SAMPLE_RTT
                 if(rtt["est_rtt"]==(-1)):
                     timeout=1
                 else:
@@ -148,6 +137,21 @@ def send_file(server_ip, server_port):
                 print(f'New timeout : {timeout}')                 
                 if ack_seq_num > last_ack_received:
                     print(f"Received cumulative ACK for packet {ack_seq_num}")
+
+                    if( not(unacked_packets[ack_seq_num-1][2] )):
+                        if(rtt["est_rtt"]==(-1)):
+                            SAMPLE_RTT=end_time-unacked_packets[ack_seq_num-1][1]
+                            rtt['est_rtt']=SAMPLE_RTT
+                            rtt['dev_rtt']=SAMPLE_RTT/2
+                            print("timeout calculated")
+                        else:
+                            SAMPLE_RTT=end_time-unacked_packets[ack_seq_num-1][1]
+                            rtt['dev_rtt']=(1-rtt['beta'])*rtt['dev_rtt']+rtt['beta']*(abs(SAMPLE_RTT-rtt['est_rtt']))
+                            rtt['est_rtt']=(1-rtt['alpha'])*rtt['est_rtt']+rtt['alpha']*SAMPLE_RTT
+                        timeout = max(rtt['est_rtt'] + rtt['k'] * rtt['dev_rtt'], 0.001)
+
+
+
                     for pk in range(last_ack_received,ack_seq_num):
                         if pk in unacked_packets:
                             del unacked_packets[pk]
@@ -217,23 +221,8 @@ def process_buffer(buffer):
     decoded_buffer = buffer.decode()
 
     packets = decoded_buffer.split("<EOP>")
-    
-    # Remove any empty strings that may result from splitting
-    packets = [pkt for pkt in packets if pkt]
-
-    # Initialize variables to track the highest sequence number and the corresponding packet
-    max_seq_num = -1
-    # max_packet = None
-
-    # Iterate over each packet, extract the sequence number and find the max
-    for packet in packets:
-        seq_num, _ = parse_ack_packet(packet.encode())  # Re-encode to byte format for parsing
-        
-        if seq_num > max_seq_num:
-            max_seq_num = seq_num
-            # max_packet = packet
-
-    return max_seq_num
+    packet=json.loads(packets[0])
+    return packet['seq_num']
 def parse_ack_packet(packet):
     """
     Parse the packet (in JSON format) to extract the sequence number.
@@ -267,8 +256,11 @@ def fast_retransmit(server_socket, client_address, unacked_packets):
     """
     Retransmit the earliest unacknowledged packet (fast recovery).
     """
+    for packet in unacked_packets:
+        unacked_packets[packet][2]=True
     min_seq_num=min(unacked_packets)
-    packet,_=unacked_packets[min_seq_num]
+    packet,_,_=unacked_packets[min_seq_num]
+
     server_socket.sendto(packet, client_address)
 
     

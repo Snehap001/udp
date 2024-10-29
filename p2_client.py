@@ -5,21 +5,8 @@ import json
 # Constants
 MSS = 1400  # Maximum Segment Size
 buffer = {}
-SAMPLE_RTT=3.0
-ALPHA=0.125
-BETA=0.25
-ESTIMATED_RTT=0
-DEV_RTT=BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
-timeout = 1.0 # Initialize timeout to some value but update it as ACK packets arrive
 import sys
 sys.stdout.reconfigure(line_buffering=True)
-    
-    
-def update_timeout():
-    global ESTIMATED_RTT,ALPHA,SAMPLE_RTT,DEV_RTT,BETA,timeout
-    ESTIMATED_RTT=(1-ALPHA)*ESTIMATED_RTT+ALPHA*SAMPLE_RTT
-    DEV_RTT=(1-BETA)*DEV_RTT+BETA*(abs(SAMPLE_RTT-ESTIMATED_RTT))
-    timeout=ESTIMATED_RTT+4*DEV_RTT
 def receive_file(server_ip, server_port,pref_outfile):
     """
     Receive the file from the server with reliability, handling packet loss
@@ -30,7 +17,6 @@ def receive_file(server_ip, server_port,pref_outfile):
     ## Add logic for handling packet loss while establishing connection
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.settimeout(2)  # Set timeout for server response
-    no_of_timeout=0
     server_address = (server_ip, server_port)
     expected_seq_num = 0
     output_file_path = f"{pref_outfile}received_file.txt"  # Default file name
@@ -78,44 +64,37 @@ def receive_file(server_ip, server_port,pref_outfile):
                 if start_bool:
                     print("Connection setup")
                     start_bool=False
-                for packet in packets[:-1]:
-                    
+                packet=packets[0]                   
                     # Logic to handle end of file
-                  
-                    end_signal=find_signal(packet)
+                end_signal=find_signal(packet)               
+                seq_num, data = parse_packet(packet)       
+            
+                # If the packet is in order, write it to the file
+                if seq_num == expected_seq_num:
                     if end_signal=="END" :
-                        while expected_seq_num in buffer:
-                            file.write(buffer.pop(expected_seq_num))  # Write the next in-order packet from the buffer
-                            print(f"Buffered packet {expected_seq_num}, writing to file")
-                            expected_seq_num += 1
+                        
                         print("Received END signal from server, file transfer complete")
                         file_transfer_ongoing=False
                         client_socket.sendto(receive_packet, server_address)
                         break
-                   
-                    seq_num, data = parse_packet(packet)
-           
+                    file.write(data)
+                    print(f"Received packet {seq_num}, writing to file")
+                    expected_seq_num+=1
+                    # Update expected seq number and send cumulative ACK for the received packet
+                    send_ack(client_socket, server_address, expected_seq_num)
+                    while expected_seq_num in buffer:
+                        file.write(buffer.pop(expected_seq_num))  # Write the next in-order packet from the buffer
+                        print(f"Buffered packet {expected_seq_num}, writing to file")
+                        expected_seq_num += 1
+                        send_ack(client_socket, server_address, expected_seq_num)
+                elif seq_num < expected_seq_num:
+                    # Duplicate or old packet, send ACK again
+                    send_ack(client_socket, server_address, expected_seq_num)
+                else:
+                    buffer[seq_num] = data  # Store the packet's data in the buffer
+                    print(f"Out-of-order packet {seq_num}, buffering it")
                 
-                    # If the packet is in order, write it to the file
-                    if seq_num == expected_seq_num:
-                        file.write(data)
-                        print(f"Received packet {seq_num}, writing to file")
-                        expected_seq_num+=1
-                        # Update expected seq number and send cumulative ACK for the received packet
-                        send_ack(client_socket, server_address, expected_seq_num)
-                        while expected_seq_num in buffer:
-                            file.write(buffer.pop(expected_seq_num))  # Write the next in-order packet from the buffer
-                            print(f"Buffered packet {expected_seq_num}, writing to file")
-                            expected_seq_num += 1
-                            send_ack(client_socket, server_address, expected_seq_num)
-                    elif seq_num < expected_seq_num:
-                        # Duplicate or old packet, send ACK again
-                        send_ack(client_socket, server_address, expected_seq_num)
-                    else:
-                        buffer[seq_num] = data  # Store the packet's data in the buffer
-                        print(f"Out-of-order packet {seq_num}, buffering it")
-                    
-                        send_ack(client_socket, server_address, expected_seq_num)
+                    send_ack(client_socket, server_address, expected_seq_num)
 
                 no_of_timeout=0
                 k+=1
@@ -126,7 +105,6 @@ def receive_file(server_ip, server_port,pref_outfile):
                     print("Timeout waiting for connection")
                 else:
                     print("Timeout waiting for data")
-                    send_ack(client_socket, server_address, expected_seq_num)
 
 
     client_socket.close()
