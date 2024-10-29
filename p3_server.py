@@ -19,7 +19,8 @@ congestion_control={
     "beta_cubic":0.5,
     "C":0.4,
     "time":0,
-    "timeout":False
+    "timeout":False,
+    "set_wmax":False
     
 }
 #Contains the state of the retransmission timer
@@ -133,7 +134,7 @@ def send_file(server_ip, server_port):
                     server_socket.sendto(end_packet, client_address)
                     try:
                         packet_data, _ = server_socket.recvfrom(1024)
-                        print(f"len_data : {len(packet_data)}")
+                        print(f"len_data : {len(packet_data)}:{time.time()}")
                         receive=packet_data.decode().split('<EOP>')
                         sign=find_signal(receive[0])
                         if sign=="RECEIVE":
@@ -149,7 +150,7 @@ def send_file(server_ip, server_port):
                 server_socket.settimeout(timeout)
                 ack_packet, _ = server_socket.recvfrom(1024)
                 end_time=time.time()
-                print(f"len_data : {len(ack_packet)}")                
+                print(f"len_data : {len(ack_packet)}:{time.time()}")                
                 data_packet=ack_packet.decode().split('<EOP>')
                 sign=find_signal(data_packet[0])
                 if sign!="ACK":
@@ -189,12 +190,11 @@ def send_file(server_ip, server_port):
                             congestion_control["time"]=time.time()
                     elif(mode==Mode.congestion_avoidance):  
                         k=congestion_control["timeout"]==True
-                        if congestion_control["timeout"]==True:
+                        if congestion_control["set_wmax"]==True:
                             congestion_control["W_max"]=congestion_control["cwnd"]
-                            
-                            cubic=w_cubic(congestion_control,time.time(),k)
-                        else:
-                            cubic=w_cubic(congestion_control,time.time(),k)
+                            congestion_control["set_wmax"]=False
+                        
+                        cubic=w_cubic(congestion_control,time.time(),k)
 
                         est=w_est(congestion_control,rtt["est_rtt"])
                         if cubic<est:
@@ -269,6 +269,7 @@ def send_file(server_ip, server_port):
                 mode=Mode.slow_start
                 timeout=min(timeout*2,10)
                 congestion_control["timeout"]=True
+                congestion_control["set_wmax"]=True
                 print(f'New timeout : {timeout}')
             # Check if we are done sending the file
     server_socket.close()
