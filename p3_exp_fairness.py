@@ -105,7 +105,7 @@ def run():
         
         pref_c1 = "1"
         pref_c2 = "2"
-        log_files = ["server1_output.log", "server2_output.log", "client1_output.log", "client2_output.log"]
+        log_files = ["server1_output_2.log", "server2_output_2.log","server2_output_25.log","server1_output_25.log", "client1_output_2.log", "client2_output_2.log","client2_output_25.log","client1_output_25.log"]
 
         # Remove old log files if they exist
         for log_file in log_files:
@@ -118,7 +118,7 @@ def run():
         s1_cmd = f"python3 p2_server.py {SERVER_IP1} {SERVER_PORT1} >> server1_output_{DELAY}.log 2>&1 &"
         s2_cmd = f"python3 p3_server.py {SERVER_IP2} {SERVER_PORT2} >> server2_output_{DELAY}.log 2>&1 &"
         c1_cmd = f"python3 p2_client.py {SERVER_IP1} {SERVER_PORT1} --pref_outfile {pref_c1} >> client1_output_{DELAY}.log 2>&1 &"
-        c2_cmd = f"python3 p3_client.py {SERVER_IP2} {SERVER_PORT2} --pref_outfile {pref_c2} >> client2_output_{DELAY}.log 2>&1 &"
+        c2_cmd = f"python3 p2_client.py {SERVER_IP2} {SERVER_PORT2} --pref_outfile {pref_c2} >> client2_output_{DELAY}.log 2>&1 &"
 
         s1_pid = s1.cmd(s1_cmd)
         s2_pid = s2.cmd(s2_cmd)
@@ -178,7 +178,8 @@ def run():
 
         f_out.write(f"{DELAY},{hash1},{hash2},{dur_c1},{dur_c2},{jfi}\n")
         # Wait a moment before starting the next iteration
-
+        os.system(f"lsof -t -iUDP:{SERVER_PORT1} | xargs -r kill -9")
+        os.system(f"lsof -t -iUDP:{SERVER_PORT2} | xargs -r kill -9")
         time.sleep(1)
     f_out.close()
     print("\n--- Completed all tests ---")
