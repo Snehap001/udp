@@ -47,7 +47,7 @@ def run(expname):
     controller_port = 6653       # Default OpenFlow controller port
     
     # Output file 
-    output_file = f'throughput_{expname}.csv'
+    output_file = f'throughput_{expname}_3.csv'
     f_out = open(output_file, 'w')
     f_out.write("loss,delay,md5_hash,throughput\n")
 
